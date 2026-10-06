@@ -121,7 +121,7 @@ Ce projet est sous **licence privée / propriétaire** — tous droits réservé
 
 ## 👤 Auteur
 
-**yvanolfotso-work** — [@yvanolfotso-work](https://github.com/yvanolfotso-work)
+**yvanolfotso-work** — [@yvanol-fotso](https://github.com/yvanol-fotso-)
 
 ---
 
