@@ -1,5 +1,7 @@
+import com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     kotlin("multiplatform")
@@ -7,6 +9,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.codingfeline.buildkonfig") version "0.15.2"
 }
 
 kotlin {
@@ -75,5 +78,23 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     buildFeatures { compose = true }
+}
+
+// URL et clé publique Supabase : lues dans local.properties (hors Git)
+// et injectées au build dans l'objet BuildKonfig.
+buildkonfig {
+    packageName = "com.siledje.mobile"
+    defaultConfigs {
+        val props = Properties().apply {
+            val f = rootProject.file("local.properties")
+            if (f.exists()) f.inputStream().use { load(it) }
+        }
+        buildConfigField(STRING, "SUPABASE_URL", props.getProperty("SUPABASE_URL") ?: "")
+        buildConfigField(STRING, "SUPABASE_ANON_KEY", props.getProperty("SUPABASE_ANON_KEY") ?: "")
+    }
 }
