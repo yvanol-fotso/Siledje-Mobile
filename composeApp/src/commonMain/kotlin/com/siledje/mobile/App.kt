@@ -1,5 +1,6 @@
 package com.siledje.mobile
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -20,7 +21,10 @@ fun App() {
     val useDarkTheme = remember { mutableStateOf<Boolean?>(null) } // null = suit le système
 
     SiledjeTheme(useDarkTheme = useDarkTheme.value) {
-        Surface(modifier = Modifier.fillMaxSize()) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
             SiledjeNavHost()
         }
     }

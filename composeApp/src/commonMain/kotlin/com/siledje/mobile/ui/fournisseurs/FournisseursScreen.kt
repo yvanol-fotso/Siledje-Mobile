@@ -3,13 +3,21 @@ package com.siledje.mobile.ui.fournisseurs
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,10 +26,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.siledje.mobile.data.repository.CatalogRepository
 import com.siledje.mobile.domain.model.Supplier
+import com.siledje.mobile.ui.components.EmptyState
+import com.siledje.mobile.ui.components.ErrorState
+import com.siledje.mobile.ui.components.InitialAvatar
+import com.siledje.mobile.ui.components.ScreenHeader
+import com.siledje.mobile.ui.components.SearchField
+import com.siledje.mobile.ui.components.SiledjeCard
+import com.siledje.mobile.ui.components.SkeletonList
+import kotlinx.coroutines.CancellationException
 
 /**
  * Équivalent mobile de supplier_view.py / supplier_table.py / supplier_form.py.
@@ -33,46 +51,106 @@ fun FournisseursScreen() {
     var loading by remember { mutableStateOf(true) }
     var suppliers by remember { mutableStateOf<List<Supplier>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
+    var reloadKey by remember { mutableStateOf(0) }
 
     val catalogRepo = remember { CatalogRepository() }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reloadKey) {
+        loading = true
+        error = null
         try {
             suppliers = catalogRepo.getAllSuppliers()
+            loading = false
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             error = e.message ?: "Erreur de chargement"
-        } finally {
             loading = false
         }
     }
 
-    when {
-        loading -> Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center
-        ) { CircularProgressIndicator(modifier = Modifier.padding(16.dp)) }
+    val shown = if (query.isBlank()) suppliers else suppliers.filter {
+        it.name.contains(query, ignoreCase = true) ||
+            (it.city ?: "").contains(query, ignoreCase = true) ||
+            (it.contactName ?: "").contains(query, ignoreCase = true)
+    }
 
-        error != null -> Text(
-            "Erreur : $error",
-            modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.error
+    Column(Modifier.fillMaxSize()) {
+        ScreenHeader(
+            title = "Fournisseurs",
+            subtitle = if (loading) "Chargement…"
+            else "${suppliers.size} fournisseur" + (if (suppliers.size > 1) "s" else ""),
+            onRefresh = { reloadKey++ }
         )
 
-        suppliers.isEmpty() -> Text("Aucun fournisseur pour l'instant.", modifier = Modifier.padding(16.dp))
-
-        else -> LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(suppliers) { supplier ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(supplier.name, style = MaterialTheme.typography.bodyLarge)
-                        supplier.phone?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                        supplier.city?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
-                    }
-                }
+        if (!loading && error == null && suppliers.isNotEmpty()) {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp)) {
+                SearchField(query, { query = it }, "Rechercher un fournisseur")
             }
         }
+
+        when {
+            loading -> SkeletonList()
+            error != null -> ErrorState(message = error ?: "", onRetry = { reloadKey++ })
+            suppliers.isEmpty() -> EmptyState(
+                icon = Icons.Filled.LocalShipping,
+                title = "Aucun fournisseur",
+                message = "Vos fournisseurs apparaîtront ici."
+            )
+            shown.isEmpty() -> EmptyState(
+                icon = Icons.Filled.SearchOff,
+                title = "Aucun résultat",
+                message = "Essaie un autre mot-clé."
+            )
+            else -> LazyColumn(
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(shown) { supplier -> SupplierCard(supplier) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SupplierCard(supplier: Supplier) {
+    SiledjeCard {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            InitialAvatar(supplier.name)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    supplier.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                supplier.contactName?.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                supplier.phone?.takeIf { it.isNotBlank() }?.let { InfoLine(Icons.Filled.Phone, it) }
+                supplier.city?.takeIf { it.isNotBlank() }?.let { InfoLine(Icons.Filled.LocationOn, it) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoLine(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(15.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
