@@ -58,7 +58,6 @@ class SalesRepository {
 
     suspend fun getAllClients(): List<Client> =
         db.from("clients").select {
-            filter { eq("is_active", 1) }
             order("name", Order.ASCENDING)
         }.decodeList()
 }

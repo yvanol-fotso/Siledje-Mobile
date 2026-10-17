@@ -19,7 +19,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -114,8 +114,8 @@ fun AccueilScreen(
                             KpiCard(
                                 label = "Stock bas",
                                 value = lowStock.size.toString(),
-                                icon = Icons.Filled.Warning,
-                                tint = semantic.warning,
+                                icon = Icons.Filled.TrendingDown,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -199,11 +199,10 @@ private fun AllGoodCard() {
 
 @Composable
 private fun LowStockCard(product: Product, category: String, onClick: () -> Unit) {
-    val warning = MaterialTheme.semantic.warning
     val outOfStock = product.stockQuantity <= 0
     SiledjeCard(onClick = onClick) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBadge(Icons.Filled.Warning, warning)
+            InitialAvatar(product.name)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -224,10 +223,10 @@ private fun LowStockCard(product: Product, category: String, onClick: () -> Unit
                     if (outOfStock) "Rupture de stock"
                     else "Reste ${product.stockQuantity} sur un seuil de ${product.minStockThreshold}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = warning
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(6.dp))
-                StockBar(product.stockQuantity, product.minStockThreshold, warning)
+                StockBar(product.stockQuantity, product.minStockThreshold, MaterialTheme.colorScheme.primary)
             }
         }
     }

@@ -25,7 +25,11 @@ object WriteGuard {
     }
 }
 
-/** Message lisible pour l'utilisateur a partir d'une exception reseau. */
+/**
+ * Message lisible pour l'utilisateur. Le texte brut des erreurs Supabase contient l'URL et les
+ * en-tetes de la requete (dont le jeton de connexion) : on ne garde que la premiere ligne,
+ * et on ne l'affiche jamais en entier.
+ */
 fun friendlyNetworkMessage(message: String?): String {
     val m = message ?: return "Une erreur est survenue."
     return when {
@@ -34,6 +38,11 @@ fun friendlyNetworkMessage(message: String?): String {
             m.contains("timeout", true) ||
             m.contains("connect", true) ||
             m.contains("network", true) -> "Impossible de joindre le serveur. Vérifiez votre connexion internet."
-        else -> m
+        m.contains("Could not find the table", true) ->
+            "Cette section n'est pas encore disponible : la table correspondante n'existe pas dans votre base Supabase."
+        else -> {
+            val firstLine = m.lineSequence().firstOrNull()?.trim().orEmpty()
+            if (firstLine.isEmpty()) "Une erreur est survenue." else firstLine.take(140)
+        }
     }
 }
