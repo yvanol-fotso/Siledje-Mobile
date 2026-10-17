@@ -34,6 +34,8 @@ val DarkOnPrimaryContainer = Color(0xFFD3E4F7)
 val DangerRed = Color(0xFFC62828) // stock bas / erreurs
 val SuccessGreen = Color(0xFF2E7D32)
 val WarningAmber = Color(0xFFB26A00)
+val SuccessGreenDark = Color(0xFF81C784)
+val WarningAmberDark = Color(0xFFFFB74D)
 
 // ── Bandeau d'en-tête (dégradé) ──────────────────────────
 val HeaderLightStart = Color(0xFF3E5F82)

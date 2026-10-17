@@ -1,6 +1,7 @@
 package com.siledje.mobile.data.repository
 
 import com.siledje.mobile.data.remote.SupabaseClientProvider.db
+import com.siledje.mobile.domain.model.Category
 import com.siledje.mobile.domain.model.Product
 import com.siledje.mobile.domain.model.StockMovement
 import com.siledje.mobile.domain.model.Supplier
@@ -17,6 +18,27 @@ import kotlinx.serialization.json.put
  * booléens sont des entiers 0/1.
  */
 class CatalogRepository {
+
+    // ── CATEGORIES ──────────────────────────────────────────────────
+
+    suspend fun getCategories(): List<Category> =
+        db.from("categories").select {
+            filter { eq("is_active", 1) }
+            order("sort_order", Order.ASCENDING)
+        }.decodeList()
+
+    suspend fun createCategory(category: Category): Category =
+        db.from("categories").insert(category) { select() }.decodeSingle()
+
+    suspend fun updateCategory(id: String, fields: Map<String, Any?>) {
+        db.from("categories").update(fields.toJson()) { filter { eq("sync_uuid", id) } }
+    }
+
+    suspend fun setCategoryActive(id: String, isActive: Boolean) {
+        db.from("categories").update(mapOf("is_active" to isActive.toInt())) {
+            filter { eq("sync_uuid", id) }
+        }
+    }
 
     // ── PRODUITS ────────────────────────────────────────────────────
 

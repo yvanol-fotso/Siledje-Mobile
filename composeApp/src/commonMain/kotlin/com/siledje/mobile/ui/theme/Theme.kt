@@ -59,6 +59,24 @@ val LocalHeaderColors = staticCompositionLocalOf {
     HeaderColors(HeaderLightStart, HeaderLightEnd)
 }
 
+/** Couleurs "metier" : succes (en stock) et avertissement (stock bas). Le rouge reste reserve aux erreurs. */
+data class SemanticColors(val success: Color, val warning: Color)
+
+val LocalSemanticColors = staticCompositionLocalOf {
+    SemanticColors(SuccessGreen, WarningAmber)
+}
+
+val MaterialTheme.semantic: SemanticColors
+    @Composable
+    get() = LocalSemanticColors.current
+
+/** Choix du theme dans le profil. */
+enum class ThemeMode(val label: String) {
+    System("Système"),
+    Light("Clair"),
+    Dark("Sombre")
+}
+
 /**
  * @param useDarkTheme null = suit le thème système (comportement par défaut) ;
  * passe true/false pour un sélecteur manuel clair/sombre dans les réglages
@@ -73,7 +91,13 @@ fun SiledjeTheme(
     val header = if (darkTheme) HeaderColors(HeaderDarkStart, HeaderDarkEnd)
     else HeaderColors(HeaderLightStart, HeaderLightEnd)
 
-    CompositionLocalProvider(LocalHeaderColors provides header) {
+    val semantic = if (darkTheme) SemanticColors(SuccessGreenDark, WarningAmberDark)
+    else SemanticColors(SuccessGreen, WarningAmber)
+
+    CompositionLocalProvider(
+        LocalHeaderColors provides header,
+        LocalSemanticColors provides semantic
+    ) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColors else LightColors,
             typography = SiledjeTypography,

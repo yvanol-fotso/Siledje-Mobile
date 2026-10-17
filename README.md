@@ -1,162 +1,105 @@
-# Siledje-Mobile
+# Siledje Mobile
 
-**Siledje-Mobile** est l'application mobile officielle du projet **Siledje**, développée en **Kotlin Multiplatform (KMP)** avec **Compose Multiplatform**. Elle permet de consulter le stock, les ventes et les fournisseurs depuis un téléphone Android (et iOS), à partir d'un codebase partagé, avec les mêmes données que l'application desktop.
+Application mobile de gestion commerciale pour boutique : ventes, stock, fournisseurs, clients et rapports, synchronisée avec la base Supabase de l'application desktop Siledje.
 
----
+Écrite en **Kotlin Multiplatform** avec **Compose Multiplatform** : une seule interface partagée entre Android et iOS (testée sur Android).
 
-## Captures d'écran
+## Fonctionnalités
 
-<p align="center">
-  <img src="docs/screenshots/1.png" width="250" alt="Écran 1" />
-  <img src="docs/screenshots/2.png" width="250" alt="Écran 2" />
-  <img src="docs/screenshots/3.png" width="250" alt="Écran 3" />
-</p>
+**Connexion et compte**
+- Connexion par email et mot de passe, création d'un compte entreprise (email, nom d'utilisateur, mot de passe confirmé).
+- Session conservée entre deux lancements, déconnexion depuis l'onglet Plus.
+- Thème clair, sombre ou automatique.
 
----
+**Accueil** : chiffres clés (ventes récentes, produits, stock bas, fournisseurs, valeur du stock), alertes de réapprovisionnement, dernières ventes.
 
-## Fonctionnalités principales
+**Ventes** : historique groupé par jour, recherche par facture ou client, et détail complet d'une facture (client, paiement, chaque article avec quantité, prix et remise, sous-total, taxes, total).
 
-- **Multiplateforme** : interface et logique métier partagées avec Compose Multiplatform.
-- **Données en direct** : lecture du stock, des ventes et des fournisseurs via Supabase, le même backend que l'application desktop.
-- **Interface moderne** : navigation par onglets (Accueil, Ventes, Stock, Fournisseurs) en Material 3.
-- **Codebase unifié** : une seule base de code pour Android et iOS.
+**Stock** : produits regroupés par catégorie, recherche par nom ou SKU, filtres Tous, Stock bas et Rupture, filtre par catégorie. Fiche produit avec marge et historique des mouvements. Ajout, modification, désactivation et ajustement de stock (entrée, sortie, correction).
 
----
+**Fournisseurs** : liste avec recherche, fiche avec appel et email en un geste, commandes passées. Ajout, modification et désactivation.
 
-## Stack technique
+**Plus** : rapports (chiffre d'affaires, panier moyen, ventes par jour, répartition des paiements, produits par catégorie), clients et leurs achats, catégories (ajout, modification, désactivation), suivi des commandes fournisseurs, mouvements de stock.
 
-- **Langage** : Kotlin (100 %)
-- **UI** : Compose Multiplatform (Material 3)
-- **Architecture** : Kotlin Multiplatform (KMP), repositories + ViewModels
-- **Backend** : Supabase (PostgREST, Auth) via `supabase-kt`
-- **Réseau et sérialisation** : Ktor, kotlinx.serialization, kotlinx-datetime
-- **Build** : Gradle (`build.gradle.kts`, `settings.gradle.kts`), BuildKonfig pour les clés
-- **Cibles** : Android et iOS
+## Technologies
 
----
+| Domaine | Choix |
+|---|---|
+| Langage et interface | Kotlin Multiplatform, Compose Multiplatform, Material 3 |
+| Navigation | Navigation Compose (barre à 5 onglets, écrans de détail et formulaires) |
+| Backend | Supabase : Postgrest (données) et Auth (comptes) |
+| Configuration | BuildKonfig, valeurs lues depuis `local.properties` |
 
-## Structure du projet
+## Installation
 
-```text
-Siledje-Mobile/
-├── composeApp/              # Module principal de l'application
-│   ├── src/
-│   │   ├── commonMain/      # Code partagé (UI, domaine, accès aux données)
-│   │   ├── androidMain/     # Code spécifique Android
-│   │   └── iosMain/         # Code spécifique iOS
-│   └── build.gradle.kts
-├── docs/
-│   └── screenshots/         # Captures d'écran du README
-├── gradle/
-│   └── wrapper/             # Wrapper Gradle
-├── build.gradle.kts         # Configuration Gradle principale
-├── settings.gradle.kts      # Configuration des modules
-├── gradlew / gradlew.bat    # Scripts d'exécution Gradle
-├── .gitignore               # Fichiers ignorés par Git
-└── README.md
+1. Cloner le dépôt et l'ouvrir avec Android Studio.
+2. Créer ou compléter le fichier `local.properties` à la racine (il n'est pas versionné) :
+
+```properties
+SUPABASE_URL=https://xxxxxxxx.supabase.co
+SUPABASE_ANON_KEY=votre_cle_publique_anon
 ```
 
----
+3. Synchroniser Gradle puis lancer le module `composeApp` sur un émulateur ou un téléphone.
 
-## Prérequis
-
-- **JDK 17 ou 21** (pas le JDK 25, incompatible avec Gradle 8.7)
-- **Android Studio** récent, avec le plugin **Kotlin Multiplatform**
-- **Xcode** (macOS uniquement) pour compiler et lancer la partie iOS
-- Un projet **Supabase** actif (les projets du plan gratuit se mettent en pause après inactivité)
-
----
+Ne mettez jamais la clé `service_role` dans l'application.
 
 ## Configuration de Supabase
 
-Les clés ne sont jamais écrites dans le code ni envoyées sur Git. Ajoute ces deux lignes dans le fichier `local.properties` à la racine du projet (fichier ignoré par Git), à la suite de la ligne `sdk.dir` :
+1. **Règles d'accès (RLS).** Une fois connecté, l'application envoie le jeton de l'utilisateur (rôle `authenticated`). Exécutez `docs/supabase_rls.sql` dans le SQL Editor de Supabase pour autoriser la lecture à ce rôle. Sans cela, toutes les listes apparaissent vides sans message d'erreur.
+2. **Confirmation par email.** Pendant le développement, désactivez **Confirm email** (Authentication, fournisseur Email). Pour valider un compte déjà créé :
 
-```properties
-SUPABASE_URL=https://votre-projet.supabase.co
-SUPABASE_ANON_KEY=votre_cle_publique
+```sql
+update auth.users set email_confirmed_at = now() where email = 'votre-email@exemple.com';
 ```
 
-Puis lance une synchronisation Gradle : le plugin BuildKonfig génère l'objet `BuildKonfig` utilisé par l'application.
+3. **Inscription libre.** L'application permet de créer un compte. Le script SQL donne accès aux données à tout compte connecté : désactivez l'inscription libre (Allow new users to sign up) une fois vos comptes créés, ou restreignez l'accès à une liste d'adresses.
 
-Remarques de sécurité :
+## Activer les écritures (CRUD)
 
-- N'utilise jamais la clé `service_role` dans l'application.
-- La clé publique est lisible dans l'application compilée. La protection des données repose sur les règles **RLS** de Supabase, qui doivent être restreintes aux utilisateurs authentifiés avant toute diffusion.
+Création, modification, désactivation et ajustement de stock sont entièrement implémentés, mais l'action finale est bloquée : l'utilisateur voit un message « Cette fonctionnalité sera bientôt disponible ».
 
----
+Pour les ouvrir, dans `composeApp/src/commonMain/kotlin/com/siledje/mobile/core/FeatureFlags.kt` :
 
-## Lancement du projet
-
-### 1. Cloner le dépôt
-
-```bash
-git clone https://github.com/yvanol-fotso/Siledje-Mobile.git
-cd Siledje-Mobile
+```kotlin
+val crudEnabled: Boolean = true
 ```
 
-### 2. Configurer Supabase
+Exécutez aussi le bloc d'écriture du fichier `docs/supabase_rls.sql`. Vérifiez enfin que les types de mouvement de stock (`in`, `out`, `adjustment`, dans `CatalogStore.kt`) correspondent à ceux de l'application desktop.
 
-Voir la section précédente.
+## Architecture
 
-### 3. Exécuter sur Android
-
-Depuis Android Studio, sélectionne la configuration `composeApp` et un appareil ou un émulateur, puis clique sur Run. En ligne de commande :
-
-```bash
-./gradlew :composeApp:assembleDebug
+```
+composeApp/src/commonMain/kotlin/com/siledje/mobile/
+  App.kt                      point d'entrée : session, connexion, application
+  core/FeatureFlags.kt        interrupteur des écritures
+  data/
+    remote/                   client Supabase unique
+    repository/               accès aux tables (catalogue, ventes, commandes, auth)
+  domain/model/               modèles sérialisables (produit, vente, client...)
+  ui/
+    theme/                    couleurs, typographie, thème clair et sombre
+    components/               composants partagés, formulaires, toasts
+    state/                    états et logique par domaine (catalogue, ventes, auth...)
+    navigation/               onglets, routes, barre du bas
+    auth/  accueil/  ventes/  stock/  fournisseurs/
+    plus/  rapports/  clients/  categories/  profile/
 ```
 
-### 4. Exécuter sur iOS
+Principes : les repositories ne font que parler à Supabase ; les états (`ui/state`) portent la logique et sont partagés entre écrans ; toutes les écritures passent par un point unique (`WriteGuard`) contrôlé par le drapeau `crudEnabled`.
 
-Sur macOS, ouvre le projet dans Android Studio et choisis le runner iOS, ou ouvre le projet Xcode généré pour lancer l'application depuis Xcode.
+## Dépannage
 
----
+| Symptôme | Cause et solution |
+|---|---|
+| Après connexion, tout est à zéro | Règles RLS limitées au rôle `anon` : exécuter `docs/supabase_rls.sql` |
+| Impossible de se connecter après inscription | Email non confirmé : désactiver Confirm email ou valider le compte en SQL |
+| Mode de paiement ou client absent d'une vente | Liaison à vérifier entre `sales` et `payment_methods` ou `clients` |
+| Message « Chargement impossible » | Pas de réseau ou URL Supabase incorrecte dans `local.properties` |
 
-## Tests
+## Pistes d'évolution
 
-```bash
-./gradlew test
-```
-
----
-
-## Contribution
-
-1. Fork du projet
-2. Création d'une branche :
-```bash
-   git checkout -b feature/NouvelleFonctionnalite
-```
-3. Commit des modifications :
-```bash
-   git commit -m "feat: description de la fonctionnalité"
-```
-4. Push vers la branche :
-```bash
-   git push origin feature/NouvelleFonctionnalite
-```
-5. Ouverture d'une Pull Request
-
----
-
-## Licence
-
-Ce projet est sous licence privée / propriétaire. Tous droits réservés par l'équipe **Siledje**.
-
----
-
-## Auteur
-
-**yvanolfotso** - [@yvanol-fotso](https://github.com/yvanol-fotso)
-
----
-
-## Statut du projet
-
-En cours de développement. L'application se connecte à Supabase et affiche le stock, les ventes et les fournisseurs. L'authentification et la sécurisation des accès restent à mettre en place.
-
----
-
-<p align="center">
-  Par l'équipe <strong>Siledje</strong>
-</p>
+- Création de ventes depuis le téléphone, avec scan de codes-barres.
+- Isolation des données par entreprise (multi-boutiques) pour sécuriser les comptes.
+- Mode hors ligne avec synchronisation.
+- Export des factures en PDF.

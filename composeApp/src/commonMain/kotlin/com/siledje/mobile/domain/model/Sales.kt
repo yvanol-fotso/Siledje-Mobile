@@ -50,6 +50,8 @@ data class Sale(
     @SerialName("tax_amount") val taxAmount: Double = 0.0,
     @SerialName("discount_amount") val discountAmount: Double = 0.0,
     @SerialName("total_amount") val totalAmount: Double = 0.0,
+    @Serializable(with = FlexStringSerializer::class)
+    @SerialName("payment_method_id") val paymentMethodId: String? = null,
     val status: String = "completed",
     val notes: String? = null,
     @SerialName("sale_date") val saleDate: String? = null,

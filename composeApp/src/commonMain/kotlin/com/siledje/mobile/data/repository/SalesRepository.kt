@@ -1,6 +1,7 @@
 package com.siledje.mobile.data.repository
 
 import com.siledje.mobile.data.remote.SupabaseClientProvider.db
+import com.siledje.mobile.domain.model.Client
 import com.siledje.mobile.domain.model.PaymentMethod
 import com.siledje.mobile.domain.model.Sale
 import com.siledje.mobile.domain.model.SaleItem
@@ -44,4 +45,20 @@ class SalesRepository {
     suspend fun countSales(): Long =
         db.from("sales").select { count(Count.EXACT) }
             .countOrNull() ?: 0L
+
+    /** Un client par son uuid (null si introuvable). */
+    suspend fun getClientById(clientId: String): Client? =
+        db.from("clients").select { filter { eq("sync_uuid", clientId) } }
+            .decodeList<Client>().firstOrNull()
+
+    /** Plusieurs clients d'un coup, pour afficher les noms dans la liste des ventes. */
+    suspend fun getClientsByIds(ids: List<String>): List<Client> =
+        if (ids.isEmpty()) emptyList()
+        else db.from("clients").select { filter { isIn("sync_uuid", ids) } }.decodeList()
+
+    suspend fun getAllClients(): List<Client> =
+        db.from("clients").select {
+            filter { eq("is_active", 1) }
+            order("name", Order.ASCENDING)
+        }.decodeList()
 }

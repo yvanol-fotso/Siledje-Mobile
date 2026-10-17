@@ -21,6 +21,12 @@ class SupplierOrderRepository {
             order("order_date", Order.DESCENDING)
         }.decodeList()
 
+    suspend fun getAllOrders(limit: Int = 100): List<SupplierOrder> =
+        db.from("supplier_orders").select {
+            order("order_date", Order.DESCENDING)
+            limit(limit.toLong())
+        }.decodeList()
+
     suspend fun getOrderItems(orderId: String): List<SupplierOrderItem> =
         db.from("supplier_order_items").select { filter { eq("order_id", orderId) } }.decodeList()
 

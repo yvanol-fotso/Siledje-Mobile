@@ -8,10 +8,12 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +26,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Refresh
@@ -31,6 +35,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,11 +56,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.siledje.mobile.ui.state.friendlyNetworkMessage
 import com.siledje.mobile.ui.theme.LocalHeaderColors
 
 /* ───────────────────────── Formatage ───────────────────────── */
 
-/** 1250000.0 -> "1 250 000 FCFA" (espaces insécables, pas d'API JVM-only). */
+/** 1250000.0 -> "1 250 000 FCFA" (espaces insecables, sans API JVM-only). */
 fun formatFcfa(amount: Double): String {
     val rounded = kotlin.math.round(amount).toLong()
     val digits = kotlin.math.abs(rounded).toString()
@@ -67,25 +73,33 @@ fun formatFcfa(amount: Double): String {
     return (if (rounded < 0) "-" else "") + sb.toString() + "\u00A0FCFA"
 }
 
-/** "2026-10-16T14:32:00" -> "16/10/2026 · 14:32". Tolérant si le format change. */
+/** "2026-10-16T14:32:00" -> "16/10/2026 à 14:32". Tolerant si le format change. */
 fun formatSaleDate(raw: String?): String {
-    if (raw.isNullOrBlank()) return "—"
+    if (raw.isNullOrBlank()) return "-"
     if (raw.length < 10) return raw
-    val d = raw.substring(0, 10).split("-")
-    if (d.size != 3) return raw
-    val date = "${d[2]}/${d[1]}/${d[0]}"
+    val date = formatDay(raw)
     val time = if (raw.length >= 16) raw.substring(11, 16) else ""
-    return if (time.isNotEmpty()) "$date · $time" else date
+    return if (time.isNotEmpty()) "$date à $time" else date
 }
 
-/* ───────────────────────── En-tête ───────────────────────── */
+/** "2026-10-16T14:32:00" -> "16/10/2026". */
+fun formatDay(raw: String?): String {
+    if (raw.isNullOrBlank() || raw.length < 10) return raw ?: "-"
+    val d = raw.substring(0, 10).split("-")
+    if (d.size != 3) return raw
+    return "${d[2]}/${d[1]}/${d[0]}"
+}
 
-/** Bandeau dégradé en haut de l'écran : titre, sous-titre, bouton actualiser, stats. */
+/* ───────────────────────── En-tete ───────────────────────── */
+
+/** Bandeau degrade en haut de l'ecran : retour, titre, actions, stats. */
 @Composable
 fun ScreenHeader(
     title: String,
     subtitle: String? = null,
+    onBack: (() -> Unit)? = null,
     onRefresh: (() -> Unit)? = null,
+    actions: (@Composable RowScope.() -> Unit)? = null,
     content: (@Composable ColumnScope.() -> Unit)? = null
 ) {
     val colors = LocalHeaderColors.current
@@ -95,19 +109,37 @@ fun ScreenHeader(
             .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
             .background(Brush.linearGradient(listOf(colors.start, colors.end)))
             .statusBarsPadding()
-            .padding(start = 20.dp, end = 12.dp, top = 14.dp, bottom = 18.dp)
+            .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 18.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.headlineSmall, color = Color.White)
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "Retour", tint = Color.White)
+                }
+            }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(start = if (onBack != null) 4.dp else 8.dp)
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 if (subtitle != null) {
                     Text(
                         subtitle,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.8f)
+                        color = Color.White.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
+            if (actions != null) actions.invoke(this)
             if (onRefresh != null) {
                 IconButton(onClick = onRefresh) {
                     Icon(Icons.Filled.Refresh, contentDescription = "Actualiser", tint = Color.White)
@@ -116,12 +148,12 @@ fun ScreenHeader(
         }
         if (content != null) {
             Spacer(Modifier.height(14.dp))
-            Column(Modifier.padding(end = 8.dp)) { content() }
+            Column(Modifier.padding(horizontal = 8.dp)) { content() }
         }
     }
 }
 
-/** Petite tuile translucide affichée dans l'en-tête (ex. total des ventes). */
+/** Petite tuile translucide affichee dans l'en-tete. */
 @Composable
 fun HeaderStat(label: String, value: String, modifier: Modifier = Modifier) {
     Column(
@@ -142,15 +174,92 @@ fun HeaderStat(label: String, value: String, modifier: Modifier = Modifier) {
     }
 }
 
-/* ───────────────────────── Cartes & petits éléments ───────────────────────── */
+/* ───────────────────────── Cartes et petits elements ───────────────────────── */
 
 @Composable
-fun SiledjeCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun SiledjeCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val clickable = if (onClick != null) {
+        Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+    } else Modifier
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().then(clickable),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         content = content
+    )
+}
+
+/** Carte avec un titre de section et un contenu espace. */
+@Composable
+fun SectionCard(
+    title: String? = null,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    SiledjeCard(modifier) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (title != null) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+fun KpiCard(label: String, value: String, icon: ImageVector, tint: Color, modifier: Modifier = Modifier) {
+    SiledjeCard(modifier) {
+        Column(Modifier.padding(14.dp)) {
+            IconBadge(icon, tint, size = 36.dp)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                value,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** Ligne "libelle ... valeur" pour les ecrans de detail. */
+@Composable
+fun InfoRow(label: String, value: String, modifier: Modifier = Modifier, valueColor: Color = Color.Unspecified) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(0.45f)
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.titleSmall,
+            color = valueColor,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(0.55f)
+        )
+    }
+}
+
+@Composable
+fun ListDivider() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant)
     )
 }
 
@@ -240,7 +349,8 @@ fun FilterPill(label: String, selected: Boolean, onClick: () -> Unit) {
             label,
             style = MaterialTheme.typography.labelLarge,
             color = fg,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            maxLines = 1
         )
     }
 }
@@ -272,7 +382,38 @@ fun SearchField(value: String, onValueChange: (String) -> Unit, placeholder: Str
     )
 }
 
-/* ───────────────────────── États : chargement / erreur / vide ───────────────────────── */
+@Composable
+fun LoadingButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    loading: Boolean = false,
+    enabled: Boolean = true,
+    icon: ImageVector? = null
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled && !loading,
+        modifier = modifier.height(52.dp),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+        } else {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(text, style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+/* ───────────────────────── Etats : chargement / erreur / vide ───────────────────────── */
 
 @Composable
 private fun shimmerBrush(): Brush {
@@ -310,12 +451,12 @@ private fun SkeletonCard() {
     }
 }
 
-/** Squelette animé (shimmer) affiché pendant le chargement — remplace le simple rond qui tourne. */
+/** Squelette anime (shimmer) affiche pendant le chargement. */
 @Composable
 fun SkeletonList(count: Int = 6, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         repeat(count) { SkeletonCard() }
     }
@@ -323,25 +464,17 @@ fun SkeletonList(count: Int = 6, modifier: Modifier = Modifier) {
 
 @Composable
 fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
-    val friendly = when {
-        message.contains("resolve host", ignoreCase = true) ||
-            message.contains("No address associated", ignoreCase = true) ||
-            message.contains("timeout", ignoreCase = true) ||
-            message.contains("connect", ignoreCase = true) ->
-            "Impossible de joindre le serveur. Vérifie ta connexion internet puis réessaie."
-        else -> "Un problème est survenu pendant le chargement."
-    }
     Column(
         modifier = modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        verticalArrangement = Arrangement.Center
     ) {
-        IconBadge(Icons.Filled.CloudOff, MaterialTheme.colorScheme.error, size = 72.dp)
+        IconBadge(Icons.Filled.CloudOff, MaterialTheme.colorScheme.onSurfaceVariant, size = 72.dp)
         Spacer(Modifier.height(16.dp))
-        Text("Connexion impossible", style = MaterialTheme.typography.titleMedium)
+        Text("Chargement impossible", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(6.dp))
         Text(
-            friendly,
+            friendlyNetworkMessage(message),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -360,7 +493,7 @@ fun EmptyState(icon: ImageVector, title: String, message: String, modifier: Modi
     Column(
         modifier = modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        verticalArrangement = Arrangement.Center
     ) {
         IconBadge(icon, MaterialTheme.colorScheme.primary, size = 72.dp)
         Spacer(Modifier.height(16.dp))
@@ -372,5 +505,85 @@ fun EmptyState(icon: ImageVector, title: String, message: String, modifier: Modi
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+/** Barre de proportion generique (0 a 1). */
+@Composable
+fun RatioBar(fraction: Float, color: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(color.copy(alpha = 0.15f))
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(4.dp))
+                .background(color)
+        )
+    }
+}
+
+/** Histogramme simple : une barre par entree (libelle, valeur). */
+@Composable
+fun BarChart(entries: List<Pair<String, Double>>, modifier: Modifier = Modifier, chartHeight: Dp = 120.dp) {
+    val max = entries.maxOfOrNull { it.second }?.takeIf { it > 0 } ?: 1.0
+    val color = MaterialTheme.colorScheme.primary
+    Row(
+        modifier = modifier.fillMaxWidth().height(chartHeight + 24.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        entries.forEach { (label, value) ->
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom
+            ) {
+                val fraction = (value / max).toFloat().coerceIn(0.03f, 1f)
+                Box(
+                    Modifier
+                        .width(22.dp)
+                        .height(chartHeight * fraction)
+                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                        .background(color.copy(alpha = if (value >= max) 1f else 0.55f))
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+/** Ligne de menu : icone, titre, sous-titre et fleche. */
+@Composable
+fun MenuRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    SiledjeCard(onClick = onClick) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconBadge(icon, MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

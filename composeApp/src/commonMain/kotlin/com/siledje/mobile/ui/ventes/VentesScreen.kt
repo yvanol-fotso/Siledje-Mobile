@@ -14,102 +14,130 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.siledje.mobile.data.repository.SalesRepository
 import com.siledje.mobile.domain.model.Sale
 import com.siledje.mobile.ui.components.EmptyState
 import com.siledje.mobile.ui.components.ErrorState
 import com.siledje.mobile.ui.components.HeaderStat
 import com.siledje.mobile.ui.components.IconBadge
 import com.siledje.mobile.ui.components.ScreenHeader
+import com.siledje.mobile.ui.components.SearchField
 import com.siledje.mobile.ui.components.SiledjeCard
 import com.siledje.mobile.ui.components.SkeletonList
 import com.siledje.mobile.ui.components.StatusChip
+import com.siledje.mobile.ui.components.formatDay
 import com.siledje.mobile.ui.components.formatFcfa
 import com.siledje.mobile.ui.components.formatSaleDate
-import com.siledje.mobile.ui.theme.SuccessGreen
-import kotlinx.coroutines.CancellationException
+import com.siledje.mobile.ui.state.SalesStore
+import com.siledje.mobile.ui.theme.semantic
 
-/**
- * Équivalent mobile de sales_view.py / sales_table.py : historique des
- * ventes, en lecture (l'encaissement reste sur la caisse desktop pour
- * l'instant — voir SalesRepository.createSale si tu veux l'ajouter ici).
- */
+/** Libelle francais d'un statut de vente. */
+fun saleStatusLabel(status: String): String = when (status.lowercase()) {
+    "completed" -> "Terminée"
+    "cancelled", "canceled" -> "Annulée"
+    "refunded" -> "Remboursée"
+    "pending" -> "En attente"
+    else -> status.replaceFirstChar { it.uppercase() }
+}
+
+/** Historique des ventes, groupe par jour. Toucher une vente ouvre le detail de la facture. */
 @Composable
-fun VentesScreen() {
-    var loading by remember { mutableStateOf(true) }
-    var sales by remember { mutableStateOf<List<Sale>>(emptyList()) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var reloadKey by remember { mutableStateOf(0) }
-
-    val salesRepo = remember { SalesRepository() }
-
-    LaunchedEffect(reloadKey) {
-        loading = true
-        error = null
-        try {
-            sales = salesRepo.getRecentSales(limit = 100)
-            loading = false
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            error = e.message ?: "Erreur de chargement"
-            loading = false
-        }
-    }
+fun VentesScreen(store: SalesStore, onOpenSale: (Sale) -> Unit, onRefresh: () -> Unit) {
+    val ready = store.loaded
+    val shown = store.filteredSales
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader(
             title = "Ventes",
             subtitle = when {
-                loading -> "Chargement…"
-                error != null -> "Indisponible"
-                else -> "${sales.size} transaction" + (if (sales.size > 1) "s" else "")
+                !ready && store.error == null -> "Chargement"
+                !ready -> "Indisponible"
+                else -> "${store.sales.size} transaction" + (if (store.sales.size > 1) "s" else "")
             },
-            onRefresh = { reloadKey++ }
+            onRefresh = onRefresh
         ) {
             HeaderStat(
-                label = "Total affiché",
-                value = if (loading || error != null) "—" else formatFcfa(sales.sumOf { it.totalAmount }),
+                label = "Total des ventes affichées",
+                value = if (ready) formatFcfa(store.sales.sumOf { it.totalAmount }) else "-",
                 modifier = Modifier.fillMaxWidth()
             )
         }
 
         when {
-            loading -> SkeletonList()
-            error != null -> ErrorState(message = error ?: "", onRetry = { reloadKey++ })
-            sales.isEmpty() -> EmptyState(
+            !ready && store.error != null -> ErrorState(message = store.error ?: "", onRetry = onRefresh)
+            !ready -> SkeletonList()
+            store.sales.isEmpty() -> EmptyState(
                 icon = Icons.Filled.ReceiptLong,
                 title = "Aucune vente",
                 message = "Les ventes enregistrées apparaîtront ici."
             )
-            else -> LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(sales) { sale -> SaleCard(sale) }
+            else -> {
+                Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp)) {
+                    SearchField(store.query, { store.query = it }, "Rechercher une facture ou un client")
+                }
+                if (shown.isEmpty()) {
+                    EmptyState(
+                        icon = Icons.Filled.SearchOff,
+                        title = "Aucun résultat",
+                        message = "Essayez un autre numéro de facture ou un autre client."
+                    )
+                } else {
+                    val groups = shown.groupBy { (it.saleDate ?: "").take(10) }
+                    LazyColumn(
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        groups.forEach { (day, list) ->
+                            item {
+                                DayHeader(
+                                    day = day,
+                                    count = list.size,
+                                    total = list.sumOf { it.totalAmount }
+                                )
+                            }
+                            items(list) { sale -> SaleCard(sale, store, onClick = { onOpenSale(sale) }) }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-/** Carte d'une vente — partagée avec l'écran Accueil. */
 @Composable
-fun SaleCard(sale: Sale) {
-    SiledjeCard {
+private fun DayHeader(day: String, count: Int, total: Double) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            if (day.isBlank()) "Date inconnue" else formatDay(day),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            "$count vente" + (if (count > 1) "s" else "") + ", " + formatFcfa(total),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** Carte d'une vente, partagee avec l'accueil. */
+@Composable
+fun SaleCard(sale: Sale, store: SalesStore, onClick: () -> Unit) {
+    val semantic = MaterialTheme.semantic
+    SiledjeCard(onClick = onClick) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBadge(Icons.Filled.ReceiptLong, SuccessGreen)
+            IconBadge(Icons.Filled.ReceiptLong, semantic.success)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -119,7 +147,7 @@ fun SaleCard(sale: Sale) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    sale.clientName ?: "Client anonyme",
+                    store.clientLabel(sale),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -133,16 +161,14 @@ fun SaleCard(sale: Sale) {
             }
             Spacer(Modifier.width(10.dp))
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    formatFcfa(sale.totalAmount),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.height(4.dp))
-                StatusChip(sale.paymentMethodName ?: "—", MaterialTheme.colorScheme.primary)
-                if (sale.status != "completed") {
+                Text(formatFcfa(sale.totalAmount), style = MaterialTheme.typography.titleSmall)
+                store.paymentLabel(sale)?.let {
                     Spacer(Modifier.height(4.dp))
-                    StatusChip(sale.status.replaceFirstChar { it.uppercase() }, MaterialTheme.colorScheme.error)
+                    StatusChip(it, MaterialTheme.colorScheme.primary)
+                }
+                if (sale.status.lowercase() != "completed") {
+                    Spacer(Modifier.height(4.dp))
+                    StatusChip(saleStatusLabel(sale.status), semantic.warning)
                 }
             }
         }
