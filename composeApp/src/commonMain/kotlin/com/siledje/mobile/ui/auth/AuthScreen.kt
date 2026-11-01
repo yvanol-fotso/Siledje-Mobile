@@ -91,7 +91,11 @@ private fun BrandMark() {
 
 /** Connexion et creation de compte entreprise (email, nom d'utilisateur, mot de passe). */
 @Composable
-fun AuthScreen(auth: AuthController) {
+fun AuthScreen(
+    auth: AuthController,
+    shopName: String = "",
+    onChangeShop: (() -> Unit)? = null
+) {
     var signUpMode by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
@@ -147,6 +151,15 @@ fun AuthScreen(auth: AuthController) {
                 color = Color.White.copy(alpha = 0.85f),
                 textAlign = TextAlign.Center
             )
+            if (shopName.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    shopName,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
 
         Column(
@@ -261,6 +274,15 @@ fun AuthScreen(auth: AuthController) {
                     auth.clearMessages()
                 }) {
                     Text(if (signUpMode) "Se connecter" else "Créer un compte")
+                }
+            }
+
+            if (onChangeShop != null) {
+                TextButton(
+                    onClick = onChangeShop,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("Changer de boutique", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

@@ -1,7 +1,5 @@
-import com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import java.util.Properties
 
 plugins {
     kotlin("multiplatform")
@@ -9,7 +7,6 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("com.codingfeline.buildkonfig") version "0.15.2"
 }
 
 kotlin {
@@ -48,6 +45,10 @@ kotlin {
             implementation("io.github.jan-tennert.supabase:realtime-kt:$supabaseVersion")
             implementation("io.ktor:ktor-client-core:$ktorVersion")
 
+            // Stockage de la configuration de la boutique (code boutique saisi au premier
+            // lancement) : SharedPreferences sur Android, NSUserDefaults sur iOS.
+            implementation("com.russhwolf:multiplatform-settings-no-arg:1.2.0")
+
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
@@ -83,18 +84,4 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true }
-}
-
-// URL et clé publique Supabase : lues dans local.properties (hors Git)
-// et injectées au build dans l'objet BuildKonfig.
-buildkonfig {
-    packageName = "com.siledje.mobile"
-    defaultConfigs {
-        val props = Properties().apply {
-            val f = rootProject.file("local.properties")
-            if (f.exists()) f.inputStream().use { load(it) }
-        }
-        buildConfigField(STRING, "SUPABASE_URL", props.getProperty("SUPABASE_URL") ?: "")
-        buildConfigField(STRING, "SUPABASE_ANON_KEY", props.getProperty("SUPABASE_ANON_KEY") ?: "")
-    }
 }
